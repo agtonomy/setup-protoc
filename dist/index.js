@@ -35311,7 +35311,7 @@ function getFileName(version, osPlatf, osArc) {
 }
 exports.getFileName = getFileName;
 // Retrieve a list of versions scraping tags from the Github API
-function fetchVersions(includePreReleases, repoToken) {
+function fetchVersions(includePreReleases, repoToken, versionPrefix = "") {
     return __awaiter(this, void 0, void 0, function* () {
         let rest;
         if (repoToken != "") {
@@ -35323,6 +35323,7 @@ function fetchVersions(includePreReleases, repoToken) {
             rest = new restm.RestClient("setup-protoc");
         }
         let tags = [];
+        let sawPrefixMatch = false;
         for (let pageNum = 1, morePages = true; morePages; pageNum++) {
             const url = "https://api.github.com/repos/protocolbuffers/protobuf/releases?page=" +
                 pageNum;
@@ -35332,11 +35333,23 @@ function fetchVersions(includePreReleases, repoToken) {
                     (repoToken === "" ? " (no repo-token provided)" : ""));
             }
             const nextPage = p.result || [];
-            if (nextPage.length > 0) {
-                tags = tags.concat(nextPage);
-            }
-            else {
+            if (nextPage.length === 0) {
                 morePages = false;
+                break;
+            }
+            tags = tags.concat(nextPage);
+            // GitHub returns releases newest-first. Once we've seen any release whose
+            // tag starts with the requested prefix and a subsequent page contains no
+            // such releases, we've passed the matching cluster and can stop paging.
+            if (versionPrefix !== "") {
+                const pageHasMatch = nextPage.some((t) => t.tag_name.replace(/^v/, "").startsWith(versionPrefix));
+                if (pageHasMatch) {
+                    sawPrefixMatch = true;
+                }
+                else if (sawPrefixMatch) {
+                    core.debug(`stopped paging after page ${pageNum}: no more matches for prefix "${versionPrefix}"`);
+                    morePages = false;
+                }
             }
         }
         core.debug(`fetched ${tags.length} releases from GitHub`);
@@ -35357,7 +35370,7 @@ function computeVersion(version, includePreReleases, repoToken) {
         if (version.endsWith(".x")) {
             version = version.slice(0, version.length - 2);
         }
-        const allVersions = yield fetchVersions(includePreReleases, repoToken);
+        const allVersions = yield fetchVersions(includePreReleases, repoToken, version);
         const validVersions = allVersions.filter((v) => v.match(semverRegex));
         const possibleVersions = validVersions.filter((v) => v.startsWith(version));
         const versionMap = new Map();

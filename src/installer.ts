@@ -171,6 +171,7 @@ export function getFileName(
 async function fetchVersions(
   includePreReleases: boolean,
   repoToken: string,
+  versionPrefix = "",
 ): Promise<string[]> {
   let rest: restm.RestClient;
   if (repoToken != "") {
@@ -182,6 +183,7 @@ async function fetchVersions(
   }
 
   let tags: IProtocRelease[] = [];
+  let sawPrefixMatch = false;
   for (let pageNum = 1, morePages = true; morePages; pageNum++) {
     const url =
       "https://api.github.com/repos/protocolbuffers/protobuf/releases?page=" +
@@ -194,10 +196,27 @@ async function fetchVersions(
       );
     }
     const nextPage: IProtocRelease[] = p.result || [];
-    if (nextPage.length > 0) {
-      tags = tags.concat(nextPage);
-    } else {
+    if (nextPage.length === 0) {
       morePages = false;
+      break;
+    }
+    tags = tags.concat(nextPage);
+
+    // GitHub returns releases newest-first. Once we've seen any release whose
+    // tag starts with the requested prefix and a subsequent page contains no
+    // such releases, we've passed the matching cluster and can stop paging.
+    if (versionPrefix !== "") {
+      const pageHasMatch = nextPage.some((t) =>
+        t.tag_name.replace(/^v/, "").startsWith(versionPrefix),
+      );
+      if (pageHasMatch) {
+        sawPrefixMatch = true;
+      } else if (sawPrefixMatch) {
+        core.debug(
+          `stopped paging after page ${pageNum}: no more matches for prefix "${versionPrefix}"`,
+        );
+        morePages = false;
+      }
     }
   }
   core.debug(`fetched ${tags.length} releases from GitHub`);
@@ -224,7 +243,11 @@ async function computeVersion(
     version = version.slice(0, version.length - 2);
   }
 
-  const allVersions = await fetchVersions(includePreReleases, repoToken);
+  const allVersions = await fetchVersions(
+    includePreReleases,
+    repoToken,
+    version,
+  );
   const validVersions = allVersions.filter((v) => v.match(semverRegex));
   const possibleVersions = validVersions.filter((v) => v.startsWith(version));
 
