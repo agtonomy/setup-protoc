@@ -183,10 +183,16 @@ async function fetchVersions(
 
   let tags: IProtocRelease[] = [];
   for (let pageNum = 1, morePages = true; morePages; pageNum++) {
-    const p = await rest.get<IProtocRelease[]>(
+    const url =
       "https://api.github.com/repos/protocolbuffers/protobuf/releases?page=" +
-        pageNum,
-    );
+      pageNum;
+    const p = await rest.get<IProtocRelease[]>(url);
+    if (p.statusCode < 200 || p.statusCode >= 300) {
+      throw new Error(
+        `GitHub releases API request failed: ${p.statusCode} for ${url}` +
+          (repoToken === "" ? " (no repo-token provided)" : ""),
+      );
+    }
     const nextPage: IProtocRelease[] = p.result || [];
     if (nextPage.length > 0) {
       tags = tags.concat(nextPage);
@@ -194,6 +200,7 @@ async function fetchVersions(
       morePages = false;
     }
   }
+  core.debug(`fetched ${tags.length} releases from GitHub`);
 
   return tags
     .filter((tag) => tag.tag_name.match(/v\d+\.[\w.]+/g))
@@ -231,7 +238,14 @@ async function computeVersion(
   core.debug(`evaluating ${versions.length} versions`);
 
   if (versions.length === 0) {
-    throw new Error("unable to get latest version");
+    const sampleAvailable = allVersions.slice(0, 10).join(", ");
+    throw new Error(
+      `unable to resolve version "${version}": ` +
+        `fetched ${allVersions.length} releases ` +
+        `(${validVersions.length} semver-valid, ${possibleVersions.length} matching prefix "${version}"). ` +
+        `includePreReleases=${includePreReleases}. ` +
+        `Sample of available versions: [${sampleAvailable}]`,
+    );
   }
 
   core.debug(`matched: ${versions[0]}`);

@@ -1,333 +1,6 @@
 /******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
-/***/ 1480:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getFileName = exports.getProtoc = void 0;
-// Load tempDirectory before it gets wiped by tool-cache
-let tempDirectory = process.env.RUNNER_TEMP || "";
-const os = __importStar(__nccwpck_require__(2037));
-const path = __importStar(__nccwpck_require__(1017));
-const util = __importStar(__nccwpck_require__(3837));
-const restm = __importStar(__nccwpck_require__(7405));
-const semver = __importStar(__nccwpck_require__(1383));
-if (!tempDirectory) {
-    let baseLocation;
-    if (process.platform === "win32") {
-        // On windows use the USERPROFILE env variable
-        baseLocation = process.env.USERPROFILE || "C:\\";
-    }
-    else {
-        if (process.platform === "darwin") {
-            baseLocation = "/Users";
-        }
-        else {
-            baseLocation = "/home";
-        }
-    }
-    tempDirectory = path.join(baseLocation, "actions", "temp");
-}
-const core = __importStar(__nccwpck_require__(2186));
-const tc = __importStar(__nccwpck_require__(7784));
-const osPlat = os.platform();
-const osArch = os.arch();
-// This regex is slighty modified from https://semver.org/ to allow only MINOR.PATCH notation.
-const semverRegex = /^(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/gm;
-function getProtoc(version, includePreReleases, repoToken) {
-    return __awaiter(this, void 0, void 0, function* () {
-        // resolve the version number
-        const targetVersion = yield computeVersion(version, includePreReleases, repoToken);
-        if (targetVersion) {
-            version = targetVersion;
-        }
-        process.stdout.write("Getting protoc version: " + version + os.EOL);
-        // look if the binary is cached
-        let toolPath;
-        toolPath = tc.find("protoc", version);
-        // if not: download, extract and cache
-        if (!toolPath) {
-            toolPath = yield downloadRelease(version);
-            process.stdout.write("Protoc cached under " + toolPath + os.EOL);
-        }
-        // expose outputs
-        core.setOutput("path", toolPath);
-        core.setOutput("version", targetVersion);
-        // add the bin folder to the PATH
-        core.addPath(path.join(toolPath, "bin"));
-    });
-}
-exports.getProtoc = getProtoc;
-function downloadRelease(version) {
-    return __awaiter(this, void 0, void 0, function* () {
-        // Download
-        const fileName = getFileName(version, osPlat, osArch);
-        const downloadUrl = util.format("https://github.com/protocolbuffers/protobuf/releases/download/%s/%s", version, fileName);
-        process.stdout.write("Downloading archive: " + downloadUrl + os.EOL);
-        let downloadPath = null;
-        try {
-            downloadPath = yield tc.downloadTool(downloadUrl);
-        }
-        catch (err) {
-            if (err instanceof tc.HTTPError) {
-                core.debug(err.message);
-                throw new Error(`Failed to download version ${version}: ${err.name}, ${err.message} - ${err.httpStatusCode}`);
-            }
-            throw new Error(`Failed to download version ${version}: ${err}`);
-        }
-        // Extract
-        const extPath = yield tc.extractZip(downloadPath);
-        // Install into the local tool cache - node extracts with a root folder that matches the fileName downloaded
-        return tc.cacheDir(extPath, "protoc", version);
-    });
-}
-/**
- *
- * @param osArc - A string identifying operating system CPU architecture for which the Node.js binary was compiled.
- * See https://nodejs.org/api/os.html#osarch for possible values.
- * @returns Suffix for the protoc filename.
- */
-function fileNameSuffix(osArc) {
-    switch (osArc) {
-        case "x64": {
-            return "x86_64";
-        }
-        case "arm64": {
-            return "aarch_64";
-        }
-        case "s390x": {
-            return "s390_64";
-        }
-        case "ppc64": {
-            return "ppcle_64";
-        }
-        default: {
-            return "x86_32";
-        }
-    }
-}
-/**
- * Returns the filename of the protobuf compiler.
- *
- * @param version - The version to download
- * @param osPlatf - The operating system platform for which the Node.js binary was compiled.
- * See https://nodejs.org/api/os.html#osplatform for more.
- * @param osArc - The operating system CPU architecture for which the Node.js binary was compiled.
- * See https://nodejs.org/api/os.html#osarch for more.
- * @returns The filename of the protocol buffer for the given release, platform and architecture.
- *
- */
-function getFileName(version, osPlatf, osArc) {
-    // to compose the file name, strip the leading `v` char
-    if (version.startsWith("v")) {
-        version = version.slice(1, version.length);
-    }
-    // in case is a rc release we add the `-`
-    if (version.includes("rc")) {
-        version = version.replace("rc", "rc-");
-    }
-    // The name of the Windows package has a different naming pattern
-    if (osPlatf == "win32") {
-        const arch = osArc == "x64" ? "64" : "32";
-        return util.format("protoc-%s-win%s.zip", version, arch);
-    }
-    const suffix = fileNameSuffix(osArc);
-    if (osPlatf == "darwin") {
-        return util.format("protoc-%s-osx-%s.zip", version, suffix);
-    }
-    return util.format("protoc-%s-linux-%s.zip", version, suffix);
-}
-exports.getFileName = getFileName;
-// Retrieve a list of versions scraping tags from the Github API
-function fetchVersions(includePreReleases, repoToken) {
-    return __awaiter(this, void 0, void 0, function* () {
-        let rest;
-        if (repoToken != "") {
-            rest = new restm.RestClient("setup-protoc", "", [], {
-                headers: { Authorization: "Bearer " + repoToken },
-            });
-        }
-        else {
-            rest = new restm.RestClient("setup-protoc");
-        }
-        let tags = [];
-        for (let pageNum = 1, morePages = true; morePages; pageNum++) {
-            const p = yield rest.get("https://api.github.com/repos/protocolbuffers/protobuf/releases?page=" +
-                pageNum);
-            const nextPage = p.result || [];
-            if (nextPage.length > 0) {
-                tags = tags.concat(nextPage);
-            }
-            else {
-                morePages = false;
-            }
-        }
-        return tags
-            .filter((tag) => tag.tag_name.match(/v\d+\.[\w.]+/g))
-            .filter((tag) => includePrerelease(tag.prerelease, includePreReleases))
-            .map((tag) => tag.tag_name.replace("v", ""));
-    });
-}
-// Compute an actual version starting from the `version` configuration param.
-function computeVersion(version, includePreReleases, repoToken) {
-    return __awaiter(this, void 0, void 0, function* () {
-        // strip leading `v` char (will be re-added later)
-        if (version.startsWith("v")) {
-            version = version.slice(1, version.length);
-        }
-        // strip trailing .x chars
-        if (version.endsWith(".x")) {
-            version = version.slice(0, version.length - 2);
-        }
-        const allVersions = yield fetchVersions(includePreReleases, repoToken);
-        const validVersions = allVersions.filter((v) => v.match(semverRegex));
-        const possibleVersions = validVersions.filter((v) => v.startsWith(version));
-        const versionMap = new Map();
-        possibleVersions.forEach((v) => versionMap.set(normalizeVersion(v), v));
-        const versions = Array.from(versionMap.keys())
-            .sort(semver.rcompare)
-            .map((v) => versionMap.get(v));
-        core.debug(`evaluating ${versions.length} versions`);
-        if (versions.length === 0) {
-            throw new Error("unable to get latest version");
-        }
-        core.debug(`matched: ${versions[0]}`);
-        return "v" + versions[0];
-    });
-}
-// Make partial versions semver compliant.
-function normalizeVersion(version) {
-    const preStrings = ["rc"];
-    const versionPart = version.split(".");
-    // drop invalid
-    if (versionPart[1] == null) {
-        //append minor and patch version if not available
-        // e.g. 23 -> 23.0.0
-        return version.concat(".0.0");
-    }
-    else {
-        // handle beta and rc
-        // e.g. 23.0-rc1 -> 23.0.0-rc1
-        if (preStrings.some((el) => versionPart[1].includes(el))) {
-            versionPart[1] = versionPart[1].replace("-rc", ".0-rc");
-            return versionPart.join(".");
-        }
-    }
-    if (versionPart[2] == null) {
-        //append patch version if not available
-        // e.g. 23.1 -> 23.1.0
-        return version.concat(".0");
-    }
-    return version;
-}
-function includePrerelease(isPrerelease, includePrereleases) {
-    return includePrereleases || !isPrerelease;
-}
-
-
-/***/ }),
-
-/***/ 3109:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core = __importStar(__nccwpck_require__(2186));
-const installer = __importStar(__nccwpck_require__(1480));
-function run() {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const version = core.getInput("version");
-            const includePreReleases = convertToBoolean(core.getInput("include-pre-releases"));
-            const repoToken = core.getInput("repo-token");
-            yield installer.getProtoc(version, includePreReleases, repoToken);
-        }
-        catch (error) {
-            core.setFailed(`${error}`);
-        }
-    });
-}
-run();
-function convertToBoolean(input) {
-    try {
-        return JSON.parse(input);
-    }
-    catch (e) {
-        return false;
-    }
-}
-
-
-/***/ }),
-
 /***/ 7351:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -35465,6 +35138,344 @@ exports["default"] = _default;
 
 /***/ }),
 
+/***/ 2574:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getFileName = exports.getProtoc = void 0;
+// Load tempDirectory before it gets wiped by tool-cache
+let tempDirectory = process.env.RUNNER_TEMP || "";
+const os = __importStar(__nccwpck_require__(2037));
+const path = __importStar(__nccwpck_require__(1017));
+const util = __importStar(__nccwpck_require__(3837));
+const restm = __importStar(__nccwpck_require__(7405));
+const semver = __importStar(__nccwpck_require__(1383));
+if (!tempDirectory) {
+    let baseLocation;
+    if (process.platform === "win32") {
+        // On windows use the USERPROFILE env variable
+        baseLocation = process.env.USERPROFILE || "C:\\";
+    }
+    else {
+        if (process.platform === "darwin") {
+            baseLocation = "/Users";
+        }
+        else {
+            baseLocation = "/home";
+        }
+    }
+    tempDirectory = path.join(baseLocation, "actions", "temp");
+}
+const core = __importStar(__nccwpck_require__(2186));
+const tc = __importStar(__nccwpck_require__(7784));
+const osPlat = os.platform();
+const osArch = os.arch();
+// This regex is slighty modified from https://semver.org/ to allow only MINOR.PATCH notation.
+const semverRegex = /^(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/gm;
+function getProtoc(version, includePreReleases, repoToken) {
+    return __awaiter(this, void 0, void 0, function* () {
+        // resolve the version number
+        const targetVersion = yield computeVersion(version, includePreReleases, repoToken);
+        if (targetVersion) {
+            version = targetVersion;
+        }
+        process.stdout.write("Getting protoc version: " + version + os.EOL);
+        // look if the binary is cached
+        let toolPath;
+        toolPath = tc.find("protoc", version);
+        // if not: download, extract and cache
+        if (!toolPath) {
+            toolPath = yield downloadRelease(version);
+            process.stdout.write("Protoc cached under " + toolPath + os.EOL);
+        }
+        // expose outputs
+        core.setOutput("path", toolPath);
+        core.setOutput("version", targetVersion);
+        // add the bin folder to the PATH
+        core.addPath(path.join(toolPath, "bin"));
+    });
+}
+exports.getProtoc = getProtoc;
+function downloadRelease(version) {
+    return __awaiter(this, void 0, void 0, function* () {
+        // Download
+        const fileName = getFileName(version, osPlat, osArch);
+        const downloadUrl = util.format("https://github.com/protocolbuffers/protobuf/releases/download/%s/%s", version, fileName);
+        process.stdout.write("Downloading archive: " + downloadUrl + os.EOL);
+        let downloadPath = null;
+        try {
+            downloadPath = yield tc.downloadTool(downloadUrl);
+        }
+        catch (err) {
+            if (err instanceof tc.HTTPError) {
+                core.debug(err.message);
+                throw new Error(`Failed to download version ${version}: ${err.name}, ${err.message} - ${err.httpStatusCode}`);
+            }
+            throw new Error(`Failed to download version ${version}: ${err}`);
+        }
+        // Extract
+        const extPath = yield tc.extractZip(downloadPath);
+        // Install into the local tool cache - node extracts with a root folder that matches the fileName downloaded
+        return tc.cacheDir(extPath, "protoc", version);
+    });
+}
+/**
+ *
+ * @param osArc - A string identifying operating system CPU architecture for which the Node.js binary was compiled.
+ * See https://nodejs.org/api/os.html#osarch for possible values.
+ * @returns Suffix for the protoc filename.
+ */
+function fileNameSuffix(osArc) {
+    switch (osArc) {
+        case "x64": {
+            return "x86_64";
+        }
+        case "arm64": {
+            return "aarch_64";
+        }
+        case "s390x": {
+            return "s390_64";
+        }
+        case "ppc64": {
+            return "ppcle_64";
+        }
+        default: {
+            return "x86_32";
+        }
+    }
+}
+/**
+ * Returns the filename of the protobuf compiler.
+ *
+ * @param version - The version to download
+ * @param osPlatf - The operating system platform for which the Node.js binary was compiled.
+ * See https://nodejs.org/api/os.html#osplatform for more.
+ * @param osArc - The operating system CPU architecture for which the Node.js binary was compiled.
+ * See https://nodejs.org/api/os.html#osarch for more.
+ * @returns The filename of the protocol buffer for the given release, platform and architecture.
+ *
+ */
+function getFileName(version, osPlatf, osArc) {
+    // to compose the file name, strip the leading `v` char
+    if (version.startsWith("v")) {
+        version = version.slice(1, version.length);
+    }
+    // in case is a rc release we add the `-`
+    if (version.includes("rc")) {
+        version = version.replace("rc", "rc-");
+    }
+    // The name of the Windows package has a different naming pattern
+    if (osPlatf == "win32") {
+        const arch = osArc == "x64" ? "64" : "32";
+        return util.format("protoc-%s-win%s.zip", version, arch);
+    }
+    const suffix = fileNameSuffix(osArc);
+    if (osPlatf == "darwin") {
+        return util.format("protoc-%s-osx-%s.zip", version, suffix);
+    }
+    return util.format("protoc-%s-linux-%s.zip", version, suffix);
+}
+exports.getFileName = getFileName;
+// Retrieve a list of versions scraping tags from the Github API
+function fetchVersions(includePreReleases, repoToken) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let rest;
+        if (repoToken != "") {
+            rest = new restm.RestClient("setup-protoc", "", [], {
+                headers: { Authorization: "Bearer " + repoToken },
+            });
+        }
+        else {
+            rest = new restm.RestClient("setup-protoc");
+        }
+        let tags = [];
+        for (let pageNum = 1, morePages = true; morePages; pageNum++) {
+            const url = "https://api.github.com/repos/protocolbuffers/protobuf/releases?page=" +
+                pageNum;
+            const p = yield rest.get(url);
+            if (p.statusCode < 200 || p.statusCode >= 300) {
+                throw new Error(`GitHub releases API request failed: ${p.statusCode} for ${url}` +
+                    (repoToken === "" ? " (no repo-token provided)" : ""));
+            }
+            const nextPage = p.result || [];
+            if (nextPage.length > 0) {
+                tags = tags.concat(nextPage);
+            }
+            else {
+                morePages = false;
+            }
+        }
+        core.debug(`fetched ${tags.length} releases from GitHub`);
+        return tags
+            .filter((tag) => tag.tag_name.match(/v\d+\.[\w.]+/g))
+            .filter((tag) => includePrerelease(tag.prerelease, includePreReleases))
+            .map((tag) => tag.tag_name.replace("v", ""));
+    });
+}
+// Compute an actual version starting from the `version` configuration param.
+function computeVersion(version, includePreReleases, repoToken) {
+    return __awaiter(this, void 0, void 0, function* () {
+        // strip leading `v` char (will be re-added later)
+        if (version.startsWith("v")) {
+            version = version.slice(1, version.length);
+        }
+        // strip trailing .x chars
+        if (version.endsWith(".x")) {
+            version = version.slice(0, version.length - 2);
+        }
+        const allVersions = yield fetchVersions(includePreReleases, repoToken);
+        const validVersions = allVersions.filter((v) => v.match(semverRegex));
+        const possibleVersions = validVersions.filter((v) => v.startsWith(version));
+        const versionMap = new Map();
+        possibleVersions.forEach((v) => versionMap.set(normalizeVersion(v), v));
+        const versions = Array.from(versionMap.keys())
+            .sort(semver.rcompare)
+            .map((v) => versionMap.get(v));
+        core.debug(`evaluating ${versions.length} versions`);
+        if (versions.length === 0) {
+            const sampleAvailable = allVersions.slice(0, 10).join(", ");
+            throw new Error(`unable to resolve version "${version}": ` +
+                `fetched ${allVersions.length} releases ` +
+                `(${validVersions.length} semver-valid, ${possibleVersions.length} matching prefix "${version}"). ` +
+                `includePreReleases=${includePreReleases}. ` +
+                `Sample of available versions: [${sampleAvailable}]`);
+        }
+        core.debug(`matched: ${versions[0]}`);
+        return "v" + versions[0];
+    });
+}
+// Make partial versions semver compliant.
+function normalizeVersion(version) {
+    const preStrings = ["rc"];
+    const versionPart = version.split(".");
+    // drop invalid
+    if (versionPart[1] == null) {
+        //append minor and patch version if not available
+        // e.g. 23 -> 23.0.0
+        return version.concat(".0.0");
+    }
+    else {
+        // handle beta and rc
+        // e.g. 23.0-rc1 -> 23.0.0-rc1
+        if (preStrings.some((el) => versionPart[1].includes(el))) {
+            versionPart[1] = versionPart[1].replace("-rc", ".0-rc");
+            return versionPart.join(".");
+        }
+    }
+    if (versionPart[2] == null) {
+        //append patch version if not available
+        // e.g. 23.1 -> 23.1.0
+        return version.concat(".0");
+    }
+    return version;
+}
+function includePrerelease(isPrerelease, includePrereleases) {
+    return includePrereleases || !isPrerelease;
+}
+
+
+/***/ }),
+
+/***/ 399:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const core = __importStar(__nccwpck_require__(2186));
+const installer = __importStar(__nccwpck_require__(2574));
+function run() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const version = core.getInput("version");
+            const includePreReleases = convertToBoolean(core.getInput("include-pre-releases"));
+            const repoToken = core.getInput("repo-token");
+            yield installer.getProtoc(version, includePreReleases, repoToken);
+        }
+        catch (error) {
+            core.setFailed(`${error}`);
+        }
+    });
+}
+run();
+function convertToBoolean(input) {
+    try {
+        return JSON.parse(input);
+    }
+    catch (e) {
+        return false;
+    }
+}
+
+
+/***/ }),
+
 /***/ 9491:
 /***/ ((module) => {
 
@@ -37366,7 +37377,7 @@ module.exports = parseParams
 /******/ 	// startup
 /******/ 	// Load entry module and return exports
 /******/ 	// This entry module is referenced by other modules so it can't be inlined
-/******/ 	var __webpack_exports__ = __nccwpck_require__(3109);
+/******/ 	var __webpack_exports__ = __nccwpck_require__(399);
 /******/ 	module.exports = __webpack_exports__;
 /******/ 	
 /******/ })()
